@@ -387,7 +387,7 @@ func TestVisitStoreMem(t *testing.T) {
 }
 
 func TestStoreFile(t *testing.T) {
-	f, err := ioutil.TempFile(os.TempDir(), "gkvlite_")
+	f, err := os.CreateTemp(os.TempDir(), "gkvlite_")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -459,7 +459,7 @@ func TestStoreFile(t *testing.T) {
 	if i == nil {
 		t.Errorf("expected s.GetItem(a) to return non-nil item")
 	}
-	if string(i.Key) != "a" {
+	if i == nil || string(i.Key) != "a" {
 		t.Errorf("expected s.GetItem(a) to return key a, got: %v", i.Key)
 	}
 	if string(i.Val) != "a" {
@@ -506,7 +506,7 @@ func TestStoreFile(t *testing.T) {
 	if i == nil {
 		t.Error("expected s2.GetItem(a) to return non-nil item")
 	}
-	if string(i.Key) != "a" {
+	if i == nil || string(i.Key) != "a" {
 		t.Errorf("expected s2.GetItem(a) to return key a, got: %v", i.Key)
 	}
 	if string(i.Val) != "a" {
@@ -647,6 +647,9 @@ func TestStoreFile(t *testing.T) {
 		}
 	}()
 	s4, err := NewStore(f4)
+	if err != nil {
+		t.Error("NewStore error:", err)
+	}
 	x4 := s4.GetCollection("x")
 
 	visitExpectCollection(t, x, "a", []string{"a", "c"}, nil)
@@ -720,6 +723,9 @@ func TestStoreFile(t *testing.T) {
 		}
 	}()
 	s5, err := NewStore(f5)
+	if err != nil{
+		t.Error("NewStore error:", err)
+	}
 	x5 := s5.GetCollection("x")
 
 	visitExpectCollection(t, x, "a", []string{"a", "d"}, nil)
@@ -753,7 +759,7 @@ func TestStoreFile(t *testing.T) {
 			t.Errorf("mmTestIdx: %v, expected Min item, but got nil",
 				mmTestIdx)
 		}
-		if string(i.Key) != mmTest.min {
+		if i == nil || string(i.Key) != mmTest.min {
 			t.Errorf("mmTestIdx: %v, expected Min item key: %v, but got: %v",
 				mmTestIdx, mmTest.min, string(i.Key))
 		}
@@ -771,7 +777,7 @@ func TestStoreFile(t *testing.T) {
 			t.Errorf("mmTestIdx: %v, expected MaxItem item, but got nil",
 				mmTestIdx)
 		}
-		if string(i.Key) != mmTest.max {
+		if i == nil || string(i.Key) != mmTest.max {
 			t.Errorf("mmTestIdx: %v, expected MaxItem item key: %v, but got: %v",
 				mmTestIdx, mmTest.max, string(i.Key))
 		}
@@ -796,13 +802,19 @@ func TestStoreFile(t *testing.T) {
 	}()
 
 	s5a, err := NewStore(f5a)
+	if err != nil{
+		t.Error("NewStore error:", err)
+	}
 	x5a := s5a.GetCollection("x")
 
 	i, err = x5a.GetItem([]byte("a"), false)
+	if err != nil{
+		t.Error("NewStore error:", err)
+	}
 	if i == nil {
 		t.Error("was expecting a item")
 	}
-	if string(i.Key) != "a" {
+	if i == nil  || string(i.Key) != "a" {
 		t.Error("was expecting a item has Key a")
 	}
 	if i.Val != nil {
@@ -810,6 +822,9 @@ func TestStoreFile(t *testing.T) {
 	}
 
 	i, err = x5a.GetItem([]byte("a"), true)
+	if err != nil{
+		t.Error("NewStore error:", err)
+	}
 	if i == nil {
 		t.Error("was expecting a item")
 	}
@@ -848,6 +863,9 @@ func TestStoreFile(t *testing.T) {
 	}()
 
 	s6, err := NewStore(f6)
+	if err != nil{
+		t.Error("NewStore error:", err)
+	}
 	x6 := s6.GetCollection("x")
 
 	visitExpectCollection(t, x, "a", []string{}, nil)
@@ -949,7 +967,7 @@ func TestStoreFile(t *testing.T) {
 			finfoSrc, _ := ccTest.src.file.Stat()
 			finfoCpy, _ := cc.file.Stat()
 			if finfoSrc.Size() < finfoCpy.Size() {
-				t.Error("%v: expected copy to be smaller / compacted"+
+				t.Errorf("%v: expected copy to be smaller / compacted"+
 					"src size: %v, cpy size: %v", ccTestIdx,
 					finfoSrc.Size(), finfoCpy.Size())
 			}
@@ -995,7 +1013,7 @@ func TestStoreFile(t *testing.T) {
 }
 
 func TestStoreMultipleCollections(t *testing.T) {
-	f, err := ioutil.TempFile(os.TempDir(), "gkvlite_")
+	f, err := os.CreateTemp(os.TempDir(), "gkvlite_")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -1154,7 +1172,7 @@ func TestStoreMultipleCollections(t *testing.T) {
 }
 
 func TestStoreConcurrentVisits(t *testing.T) {
-	f, err := ioutil.TempFile(os.TempDir(), "gkvlite_")
+	f, err := os.CreateTemp(os.TempDir(), "gkvlite_")
 	fname := f.Name()
 	defer reportRemove(fname, t)
 	if err != nil {
@@ -1213,7 +1231,7 @@ func TestStoreConcurrentVisits(t *testing.T) {
 }
 
 func TestStoreConcurrentDeleteDuringVisits(t *testing.T) {
-	f, err := ioutil.TempFile(os.TempDir(), "gkvlite_")
+	f, err := os.CreateTemp(os.TempDir(), "gkvlite_")
 	fname := f.Name()
 	defer reportRemove(fname, t)
 	if err != nil {
@@ -1385,7 +1403,7 @@ func TestBadStoreFile(t *testing.T) {
 }
 
 func TestEvictSomeItems(t *testing.T) {
-	f, err := ioutil.TempFile(os.TempDir(), "gkvlite_")
+	f, err := os.CreateTemp(os.TempDir(), "gkvlite_")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -1428,7 +1446,7 @@ func TestEvictSomeItems(t *testing.T) {
 }
 
 func TestJoinWithFileErrors(t *testing.T) {
-	f, err := ioutil.TempFile(os.TempDir(), "gkvlite_")
+	f, err := os.CreateTemp(os.TempDir(), "gkvlite_")
 	fname := f.Name()
 	defer reportRemove(fname, t)
 	defer func() {
@@ -1475,7 +1493,7 @@ func TestJoinWithFileErrors(t *testing.T) {
 		t.Errorf("expected 0 truncates, got: %#v", m)
 	}
 	var f2 *os.File
-	f2, err = ioutil.TempFile(os.TempDir(), "gkvlite_")
+	f2, err = os.CreateTemp(os.TempDir(), "gkvlite_")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -1765,7 +1783,7 @@ func TestVisitItemsDescend(t *testing.T) {
 }
 
 func TestKeyCompareForCollectionCallback(t *testing.T) {
-	f, err := ioutil.TempFile(os.TempDir(), "gkvlite_")
+	f, err := os.CreateTemp(os.TempDir(), "gkvlite_")
 	fname := f.Name()
 	defer reportRemove(fname, t)
 	if err != nil {
@@ -1839,7 +1857,7 @@ func TestMemoryDeleteEveryItem(t *testing.T) {
 }
 
 func TestPersistDeleteEveryItem(t *testing.T) {
-	f, err := ioutil.TempFile(os.TempDir(), "gkvlite_")
+	f, err := os.CreateTemp(os.TempDir(), "gkvlite_")
 	fname := f.Name()
 	defer reportRemove(fname, t)
 	if err != nil {
@@ -2211,7 +2229,7 @@ func TestMemoryFlushRevert(t *testing.T) {
 }
 
 func TestFlushRevertEmptyStore(t *testing.T) {
-	f, err := ioutil.TempFile(os.TempDir(), "gkvlite_")
+	f, err := os.CreateTemp(os.TempDir(), "gkvlite_")
 	fname := f.Name()
 	defer reportRemove(fname, t)
 	defer func() {
@@ -2257,7 +2275,7 @@ func TestFlushRevertEmptyStore(t *testing.T) {
 }
 
 func TestFlushRevert(t *testing.T) {
-	f, err := ioutil.TempFile(os.TempDir(), "gkvlite_")
+	f, err := os.CreateTemp(os.TempDir(), "gkvlite_")
 	fname := f.Name()
 	defer reportRemove(fname, t)
 	defer func() {
@@ -2403,7 +2421,7 @@ func TestFlushRevert(t *testing.T) {
 }
 
 func TestFlushRevertWithReadError(t *testing.T) {
-	f, err := ioutil.TempFile(os.TempDir(), "gkvlite_")
+	f, err := os.CreateTemp(os.TempDir(), "gkvlite_")
 	fname := f.Name()
 	defer reportRemove(fname, t)
 	defer func() {
@@ -2589,7 +2607,7 @@ func TestNodeLocRead(t *testing.T) {
 }
 
 func TestNumInfo(t *testing.T) {
-	f, err := ioutil.TempFile(os.TempDir(), "gkvlite_")
+	f, err := os.CreateTemp(os.TempDir(), "gkvlite_")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -2646,7 +2664,7 @@ func TestNumInfo(t *testing.T) {
 }
 
 func TestWriteEmptyItemsErr(t *testing.T) {
-	f, err := ioutil.TempFile(os.TempDir(), "gkvlite_")
+	f, err := os.CreateTemp(os.TempDir(), "gkvlite_")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -2681,7 +2699,7 @@ func TestWriteEmptyItemsErr(t *testing.T) {
 }
 
 func TestWriteItemsErr(t *testing.T) {
-	f, err := ioutil.TempFile(os.TempDir(), "gkvlite_")
+	f, err := os.CreateTemp(os.TempDir(), "gkvlite_")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -2741,7 +2759,7 @@ func TestWriteItemsErr(t *testing.T) {
 }
 
 func TestStatErr(t *testing.T) {
-	f, err := ioutil.TempFile(os.TempDir(), "gkvlite_")
+	f, err := os.CreateTemp(os.TempDir(), "gkvlite_")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -2797,7 +2815,7 @@ func TestStatErr(t *testing.T) {
 }
 
 func TestNodeLocWriteErr(t *testing.T) {
-	f, err := ioutil.TempFile(os.TempDir(), "gkvlite_")
+	f, err := os.CreateTemp(os.TempDir(), "gkvlite_")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -3053,7 +3071,7 @@ func TestStoreRefCountRandom(t *testing.T) {
 }
 
 func TestPersistRefCountRandom(t *testing.T) {
-	f, err := ioutil.TempFile(os.TempDir(), "gkvlite_")
+	f, err := os.CreateTemp(os.TempDir(), "gkvlite_")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -3180,7 +3198,7 @@ func TestPersistRefCountRandom(t *testing.T) {
 }
 
 func TestEvictRefCountRandom(t *testing.T) {
-	f, err := ioutil.TempFile(os.TempDir(), "gkvlite_")
+	f, err := os.CreateTemp(os.TempDir(), "gkvlite_")
 	if err != nil {
 		log.Fatal(err)
 	}

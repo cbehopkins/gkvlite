@@ -454,7 +454,7 @@ func (t *Collection) VisitItemsRandom(
 		return err
 	}
 	if (lenBlock < 1) || (numBlocks < 1) {
-		return fmt.Errorf("Impossible block sizes,%d,%d", lenBlock, numBlocks)
+		return fmt.Errorf("impossible block sizes,%d,%d", lenBlock, numBlocks)
 	}
 	blockStore := make([][]byte, 0, numBlocks)
 
@@ -519,7 +519,7 @@ func (t *Collection) VisitItemsAscendBlockEx(
 		return err
 	}
 	if (lenBlock < 1) || (numBlocks < 1) {
-		return fmt.Errorf("Impossible block sizes,%d,%d", lenBlock, numBlocks)
+		return fmt.Errorf("impossible block sizes,%d,%d", lenBlock, numBlocks)
 	}
 	blockStore := make([][]byte, 0, numBlocks)
 
@@ -700,7 +700,7 @@ func (t *Collection) UnmarshalJSON(d []byte) error {
 	nloc := t.mkNodeLoc(nil)
 	nloc.loc = &p
 	if !t.rootCAS(nil, t.mkRootNodeLoc(nloc)) {
-		return errors.New("Concurrent mutation during UnmarshalJSON()")
+		return errors.New("concurrent mutation during UnmarshalJSON()")
 	}
 	return nil
 }

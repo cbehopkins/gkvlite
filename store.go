@@ -79,15 +79,15 @@ type StoreCallbacks struct {
 
 	// Optional callback to allow you to track gkvlite's ref-counts on
 	// an Item.  Apps might use this for buffer management and putting
-	// Item's on a free-list.
+	// Items on a free-list.
 	ItemAddRef func(c *Collection, i *Item)
 
 	// Optional callback to allow you to track gkvlite's ref-counts on
 	// an Item.  Apps might use this for buffer management and putting
-	// Item's on a free-list.
+	// Items on a free-list.
 	ItemDecRef func(c *Collection, i *Item)
 
-	// Optional callback to control on-disk size, in bytes, of an item's value.
+	// Optional callback to control on-disk size, in bytes, of an items value.
 	ItemValLength func(c *Collection, i *Item) int
 
 	// Optional callback to allow you to write item bytes differently.
@@ -450,79 +450,100 @@ func (s *Store) readRoots() error {
 func (s *Store) readRootsScan(defaultToEmpty bool) (err error) {
 	rootsEnd := make([]byte, rootsEndLen)
 	for {
-		for { // Scan backwards for MAGIC_END.
-			if atomic.LoadInt64(&s.size) <= rootsLen {
-				if defaultToEmpty {
-					atomic.StoreInt64(&s.size, 0)
-					return nil
-				}
-				return errors.New("couldn't find roots; file corrupted or wrong?")
-			}
-			if _, err := s.file.ReadAt(rootsEnd,
-				atomic.LoadInt64(&s.size)-int64(len(rootsEnd))); err != nil {
-				return err
-			}
-			if bytes.Equal(MagicEnd, rootsEnd[8+4:8+4+len(MagicEnd)]) &&
-				bytes.Equal(MagicEnd, rootsEnd[8+4+len(MagicEnd):]) {
-				break
-			}
-			atomic.AddInt64(&s.size, -1) // TODO: optimizations to scan backwards faster.
+		if err := s.scanBackwardsForMagicEnd(rootsEnd, defaultToEmpty); err != nil {
+			return err
 		}
-		// Read and check the roots.
-		var offset int64
-		var length uint32
-		endBuf := bytes.NewBuffer(rootsEnd)
-		err = binary.Read(endBuf, binary.BigEndian, &offset)
+		offset, length, err := s.readRootsEnd(rootsEnd)
 		if err != nil {
 			return err
 		}
-		if err = binary.Read(endBuf, binary.BigEndian, &length); err != nil {
-			return err
+		if err := s.checkAndReadRoots(offset, length, rootsEnd); err == nil {
+			return nil
 		}
-		if offset >= 0 && offset < atomic.LoadInt64(&s.size)-int64(rootsLen) &&
-			length == uint32(atomic.LoadInt64(&s.size)-offset) {
-			data := make([]byte, atomic.LoadInt64(&s.size)-offset-int64(len(rootsEnd)))
-			if _, err := s.file.ReadAt(data, offset); err != nil {
-				return err
-			}
-			if bytes.Equal(MagicBeg, data[:len(MagicBeg)]) &&
-				bytes.Equal(MagicBeg, data[len(MagicBeg):2*len(MagicBeg)]) {
-				var version, length0 uint32
-				b := bytes.NewBuffer(data[2*len(MagicBeg):])
-				if err = binary.Read(b, binary.BigEndian, &version); err != nil {
-					return err
-				}
-				if err = binary.Read(b, binary.BigEndian, &length0); err != nil {
-					return err
-				}
-				if version != Version {
-					return fmt.Errorf("version mismatch: "+
-						"current version: %v != found version: %v", Version, version)
-				}
-				if length0 != length {
-					return fmt.Errorf("length mismatch: "+
-						"wanted length: %v != found length: %v", length0, length)
-				}
-				m := make(map[string]*Collection)
-				if err = json.Unmarshal(data[2*len(MagicBeg)+4+4:], &m); err != nil {
-					return err
-				}
-				for collName, t := range m {
-					t.name = collName
-					t.store = s
-					if s.callbacks.KeyCompareForCollection != nil {
-						t.compare = s.callbacks.KeyCompareForCollection(collName)
-					}
-					if t.compare == nil {
-						t.compare = bytes.Compare
-					}
-				}
-				s.setColl(&m)
-				return nil
-			} // else, perhaps value was unlucky in having MAGIC_END's.
-		} // else, perhaps a gkvlite file was stored as a value.
 		atomic.AddInt64(&s.size, -1) // Roots were wrong, so keep scanning.
 	}
+}
+
+func (s *Store) scanBackwardsForMagicEnd(rootsEnd []byte, defaultToEmpty bool) error {
+	for {
+		if atomic.LoadInt64(&s.size) <= rootsLen {
+			if defaultToEmpty {
+				atomic.StoreInt64(&s.size, 0)
+				return nil
+			}
+			return errors.New("couldn't find roots; file corrupted or wrong?")
+		}
+		if _, err := s.file.ReadAt(rootsEnd, atomic.LoadInt64(&s.size)-int64(len(rootsEnd))); err != nil {
+			return err
+		}
+		if bytes.Equal(MagicEnd, rootsEnd[8+4:8+4+len(MagicEnd)]) &&
+			bytes.Equal(MagicEnd, rootsEnd[8+4+len(MagicEnd):]) {
+			break
+		}
+		atomic.AddInt64(&s.size, -1) // TODO: optimizations to scan backwards faster.
+	}
+	return nil
+}
+
+func (s *Store) readRootsEnd(rootsEnd []byte) (int64, uint32, error) {
+	var offset int64
+	var length uint32
+	endBuf := bytes.NewBuffer(rootsEnd)
+	if err := binary.Read(endBuf, binary.BigEndian, &offset); err != nil {
+		return 0, 0, err
+	}
+	if err := binary.Read(endBuf, binary.BigEndian, &length); err != nil {
+		return 0, 0, err
+	}
+	return offset, length, nil
+}
+
+func (s *Store) checkAndReadRoots(offset int64, length uint32, rootsEnd []byte) error {
+	if offset >= 0 && offset < atomic.LoadInt64(&s.size)-int64(rootsLen) &&
+		length == uint32(atomic.LoadInt64(&s.size)-offset) {
+		data := make([]byte, atomic.LoadInt64(&s.size)-offset-int64(len(rootsEnd)))
+		if _, err := s.file.ReadAt(data, offset); err != nil {
+			return err
+		}
+		if bytes.Equal(MagicBeg, data[:len(MagicBeg)]) &&
+			bytes.Equal(MagicBeg, data[len(MagicBeg):2*len(MagicBeg)]) {
+			return s.validateAndSetCollections(data, length)
+		}
+	}
+	return errors.New("invalid roots")
+}
+
+func (s *Store) validateAndSetCollections(data []byte, length uint32) error {
+	var version, length0 uint32
+	b := bytes.NewBuffer(data[2*len(MagicBeg):])
+	if err := binary.Read(b, binary.BigEndian, &version); err != nil {
+		return err
+	}
+	if err := binary.Read(b, binary.BigEndian, &length0); err != nil {
+		return err
+	}
+	if version != Version {
+		return fmt.Errorf("version mismatch: current version: %v != found version: %v", Version, version)
+	}
+	if length0 != length {
+		return fmt.Errorf("length mismatch: wanted length: %v != found length: %v", length0, length)
+	}
+	m := make(map[string]*Collection)
+	if err := json.Unmarshal(data[2*len(MagicBeg)+4+4:], &m); err != nil {
+		return err
+	}
+	for collName, t := range m {
+		t.name = collName
+		t.store = s
+		if s.callbacks.KeyCompareForCollection != nil {
+			t.compare = s.callbacks.KeyCompareForCollection(collName)
+		}
+		if t.compare == nil {
+			t.compare = bytes.Compare
+		}
+	}
+	s.setColl(&m)
+	return nil
 }
 
 // ItemAlloc allocates an item in the requested collection

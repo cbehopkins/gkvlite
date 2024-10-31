@@ -301,7 +301,7 @@ func (o *Store) visitNodes(t *Collection, n *nodeLoc, target []byte,
 		return true, nil
 	}
 	if saveMem {
-		//defer nNode.Evict()
+		defer nNode.Evict()
 	}
 	nItemLoc := &nNode.item
 	nItem, err := nItemLoc.read(t, false)
